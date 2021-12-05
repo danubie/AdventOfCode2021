@@ -25,17 +25,19 @@ function DebugData ($data) {
 }
 
 function ShowField ($field, $dimension) {
-    for ($i = 0; $i -lt $dimension; $i++) {
-        for ($j = 0; $j -lt $dimension; $j++) {
+    if ($VerbosePreference -ne 'Continue') { return }
+    for ($j = 0; $j -lt $dimension; $j++) {
+        $s = ''
+        for ($i = 0; $i -lt $dimension; $i++) {
             if ($field[$i, $j] -eq 0) {
-                Write-Host "." -NoNewline
+                $s = $s + "."
             } else {
-                Write-Host $field[$i, $j] -NoNewline
+                $s = $s + $field[$i, $j]
             }
         }
-        Write-Host ""
+        Write-Verbose $s
     }
-    Write-Host "        ----------"
+    Write-Verbose "        ----------"
 }
 
 function CountFieldsGreaterThenOne ($field, $dimension) {
@@ -78,11 +80,18 @@ function xInitField ($dimension) {
 
 function MarkLines ($field, $data) {
     foreach ($coord in $data) {
-        for ($i = $coord.From.x; $i -le $coord.To.x; $i++) {
-            for ($j = $coord.From.y; $j -le $coord.To.y; $j++) {
-                $field[$i, $j] = $field[$i, $j] + 1
-            }
-        }
+        $i = $coord.From.x
+        $j = $coord.From.y
+        $iIncr = $coord.From.x -lt $coord.To.x ? 1 : ($coord.From.x -eq $coord.To.x ? 0 : -1)
+        $jIncr = $coord.From.y -lt $coord.To.y ? 1 : ($coord.From.y -eq $coord.To.y ? 0 : -1)
+        do {
+           $field[$i, $j] = $field[$i, $j] + 1
+           $i += $iIncr; $j += $jIncr;
+        } until ($i -eq $coord.To.x -and $j -eq $coord.To.y)
+        # set the last point
+        $field[$i, $j] = $field[$i, $j] + 1
+       Write-Verbose "$($coord.From.x),$($coord.From.y) -> $($coord.To.x),$($coord.To.y)"
+       ShowField $field $dimension
     }
 }
 
@@ -109,6 +118,15 @@ function part1 ($filename, $dimension) {
     $count = CountFieldsGreaterThenOne $field $dimension
     Write-Host "Number of fields with more then one line: $count"
 }
-
-part1 $PSScriptRoot\05_HydrothermalVenture.txt 1000
+part1 $PSScriptRoot\05_HydrothermalVenture-Sample.txt 10
+function part2 ($filename, $dimension) {
+    $field = New-Object 'System.Int32[,]' $dimension,$dimension
+    $data = ReadInputData $filename
+    # NormalizeCoordinates $data
+    MarkLines $field $data
+    ShowField $field $dimension
+    $count = CountFieldsGreaterThenOne $field $dimension
+    Write-Host "Number of fields with more then one line: $count"
+}
+part2 $PSScriptRoot\05_HydrothermalVenture.txt 1000
 
