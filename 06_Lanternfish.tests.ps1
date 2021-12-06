@@ -31,7 +31,7 @@ Describe "Laternfish" {
             $FishTimer -join ',' | Should -Be "6,0,6,4,5,6,0,1,1,2,6,0,1,1,1,2,2,3,3,4,6,7,8,8,8,8"
         }
         It "Part 1" {
-            $ret = Day06a($filename)
+            $ret = Day06a $filename 80
             $ret | Should -Be 5934
         }
     }
@@ -40,7 +40,7 @@ Describe "Laternfish" {
             $filename = "$PSScriptRoot\06_Lanternfish.txt"
         }
         It "Part 1" {
-            $ret = Day06a($filename)
+            $ret = Day06a $filename 80
             $ret | Should -Be 387413
         }
     }

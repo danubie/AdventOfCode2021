@@ -16,12 +16,12 @@ function RunDays {
         }
     }
 }
-function Day06a ($filename) {
+function Day06a ($filename, $nBDays) {
     # read starting reprocude rates
     [System.Collections.ArrayList]$FishTimer = @()
     ReadInputData $filename $FishTimer
 
-    RunDays 80 $FishTimer
+    RunDays $nBDays $FishTimer
 
     $nbFishes = $FishTimer.Count
     return $nbFishes
