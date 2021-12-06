@@ -35,4 +35,13 @@ Describe "Laternfish" {
             $ret | Should -Be 5934
         }
     }
+    Context "my input data" {
+        BeforeEach {
+            $filename = "$PSScriptRoot\06_Lanternfish.txt"
+        }
+        It "Part 1" {
+            $ret = Day06a($filename)
+            $ret | Should -Be 387413
+        }
+    }
 }
