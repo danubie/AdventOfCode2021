@@ -1,5 +1,7 @@
 $Script:Packets = @()
+$Script:Stack = New-Object System.Collections.Stack
 $Script:DebugStartStream = ''
+$Script:Marker = [int64]::MinValue          # mark that an operator has to be executed
 
 function ConvertTo-BinaryStringFromHexString ([string]$hexString) {
     $stream = ''
@@ -90,7 +92,7 @@ function Get-PacketHeader ($binstream) {
         SubStream = $substream
         Rest = $rest
     }
-    DebugPacketHeader $header $binstream
+    # DebugPacketHeader $header $binstream
     return $header
 }
 
@@ -102,12 +104,87 @@ function DebugPacket ($thePacketResult) {
     # Write-Verbose $s
 }
 
+function ApplyOperator($Packet) {
+    # zuerst alle Elemenate vom Stack in ein Array packen bis ein Operator kommt
+    $rev = @()
+    while ($Script:Stack.Peek() -ne $Script:Marker) {
+        $rev += $Script:Stack.Pop()
+    }
+    # dann den Operator aus dem Stack holen
+    $op = $Script:Stack.Pop()
+    if ($op -ne $Script:Marker) {
+        Write-Warning "Marker expected but found $op"
+    }
+    # $rev = $Script:Stack.ToArray()
+    # $Script:Stack.Clear()
+    $array = @()
+    for ($i = $rev.Length - 1; $i -ge 0; $i--) {
+        $array += $rev[$i]
+    }
+    switch ([int]$Packet.Type) {
+        0 {     # sum all elements and push it to the stack
+            $sum = 0
+            foreach ($e in $array) {
+                $sum += $e
+            }
+            $Script:Stack.Push($sum)
+          }
+        1 {    # build the product of all elements and push it to the stack
+            $product = 1
+            foreach ($e in $array) {
+                $product *= $e
+            }
+            $Script:Stack.Push($product)
+
+        }
+        2 {    # select the minimum element and push it to the stack
+            $min = $array[0]
+            foreach ($e in $array) {
+                if ($e -lt $min) {
+                    $min = $e
+                }
+            }
+            $Script:Stack.Push($min)
+        }
+        3 {    # select the maximum element and push it to the stack
+            $max = $array[0]
+            foreach ($e in $array) {
+                if ($e -gt $max) {
+                    $max = $e
+                }
+            }
+            $Script:Stack.Push($max)
+        }
+        5 {    # push 1 to the stack if the first element is greater then the second
+            if ($array[0] -gt $array[1]) {
+                $Script:Stack.Push(1)
+            } else {
+                $Script:Stack.Push(0)
+            }
+        }
+        6 {    # push 1 to the stack if the first element is smaller then the second
+            if ($array[0] -lt $array[1]) {
+                $Script:Stack.Push(1)
+            } else {
+                $Script:Stack.Push(0)
+            }
+        }
+        7 {    # push 1 to the stack if the first element is equal to the second
+            if ($array[0] -eq $array[1]) {
+                $Script:Stack.Push(1)
+            } else {
+                $Script:Stack.Push(0)
+            }
+        }
+        Default {}
+    }
+}
 
 # read binary stream for literals
 # first bit 1 this is not last group; then 4 bits are the value
 # first bit 0 this is last group; then 4 bits are the value
 function Get-Literal($version, $type, $binString) {
-    Write-Verbose "    Literal V:$version, T:$type"
+    # Write-Verbose "    Literal V:$version, T:$type"
     $binString = $binString.Substring(6)
     $local = ''
     $result = ''
@@ -129,12 +206,13 @@ function Get-Literal($version, $type, $binString) {
     }
     DebugPacket $thisPacket
     $Script:Packets += $thisPacket
-    Write-Verbose "    Literal end; rest=[$($thisPacket.rest)]"
+    $Script:Stack.Push($thisPacket.literalResult)
+    # Write-Verbose "    Literal end; rest=[$($thisPacket.rest)]"
     return $thisPacket.rest
 }
 
 function Get-OperatorBits ($version, $type, $binStream) {
-    Write-Verbose "    bitOperator: version=$version; Type=$type"
+    # Write-Verbose "    bitOperator: version=$version; Type=$type"
 
     $bits15 = $binStream.Substring(7,15)
     $bitsLen = [ulong]"0b$bits15"
@@ -148,18 +226,20 @@ function Get-OperatorBits ($version, $type, $binStream) {
         rest = $binStream.Substring((7+15+$bitsLen))
     }
     DebugPacket $thisPacket
+    $Script:Stack.Push($Script:Marker)
     do {
         $subStream = Analyze-Stream $subStream
     } while ($subStream.length -gt 6)
 
     # Write-Verbose ("    bitOper(end): version={0}; Type={1}, Operator={2}, Rest={3}" -f $thisPacket.version, $thisPacket.type, $thisPacket.operator, $thisPacket.rest)
+    ApplyOperator $thisPacket
     $Script:Packets += $thisPacket
-    Write-Verbose "    bitOperator end; rest=[$($thisPacket.rest)]; substream=[$substream]"
+    # Write-Verbose "    bitOperator end; rest=[$($thisPacket.rest)]; substream=[$substream]"
     return $thisPacket.rest
 }
 
 function Get-OperatorCnt ($version, $type, $binStream) {
-    Write-Verbose "    cntOper: version=$version Operator=$type; "
+    # Write-Verbose "    cntOper: version=$version Operator=$type; "
 
     $bits11 = $binStream.Substring(7,11)
     $bitsCountSubPackets = [ulong]"0b$bits11"
@@ -173,20 +253,22 @@ function Get-OperatorCnt ($version, $type, $binStream) {
         rest = 'unknown'
     }
     DebugPacket $thisPacket
+    $Script:Stack.Push($Script:Marker)
     for ($i=0; $i -lt $bitsCountSubPackets; $i++) {
-        Write-Verbose "                                 Packet#:[$($i+1)]"
+        # Write-Verbose "                                 Packet#:[$($i+1)]"
         $binStream = Analyze-Stream $binStream
     }
     $thisPacket.rest = $binStream
     $Script:Packets += $thisPacket
-    Write-Verbose "    cntOperator end; rest=[$($thisPacket.rest)]"
+    ApplyOperator $thisPacket
+    # Write-Verbose "    cntOperator end; rest=[$($thisPacket.rest)]"
     return $thisPacket.rest
 }
 
 function Analyze-Stream ($binStream) {
-    Write-Verbose "Analyze Stream"
+    # Write-Verbose "Analyze Stream"
 
-    Write-Verbose "            in loop"
+    # Write-Verbose "            in loop"
     $d = Get-PacketHeader $binStream
 
     $version = Get-PacketVersion $binStream
@@ -205,7 +287,7 @@ function Analyze-Stream ($binStream) {
         }
     }
     #    $binStream = $thisPacket.rest
-    Write-Verbose "Analyze Stream: end; [$binStream]"
+    # Write-Verbose "Analyze Stream: end; [$binStream]"
     return $binStream
 }
 

@@ -119,7 +119,37 @@ Describe "Testing Part 1" {
 }
 Describe "Part 1 using my puzzle input" {
     It "should return 889" {
-        $ret = Part1 (Get-Content "$PSScriptRoot\16_PacketDecoder-sample.txt")
+        $ret = Part1 (Get-Content "$PSScriptRoot\16_PacketDecoder.txt")
         $ret | Should -Be 889
+    }
+}
+
+Describe "Testing Part 2" {
+
+    It "<Run> should give correct result <expected>" -ForEach @(
+        @{Run = 1;    expected =  3; HexTransmission = 'C200B40A82'}
+        @{Run = 2;    expected = 54; HexTransmission = '04005AC33890'}
+        @{Run = 3;    expected =  7; HexTransmission = '880086C3E88112'}
+        @{Run = 4;    expected =  9; HexTransmission = 'CE00C43D881120'}
+        @{Run = 5;    expected =  1; HexTransmission = 'D8005AC2A8F0'}
+        @{Run = 6;    expected =  0; HexTransmission = 'F600BC2D8F'}
+        @{Run = 7;    expected =  0; HexTransmission = '9C005AC2F8F0'}
+        @{Run = 8;    expected =  1; HexTransmission = '9C0141080250320F1802104A08'}
+    ) {
+        # $VerbosePreference='Continue'
+        $Script:Stack.Clear()
+        $null = Part1 $HexTransmission
+        $ret = $Script:Stack.Pop()
+        $ret | Should -Be $expected
+        {$Script:Stack.Pop()} | Should -Throw   # Stack should be empty
+    }
+}
+
+Describe "Part 2 using my puzzle input" {
+    It "should return ??? But is to low. Will not find out, cause all known test cases are OK" {
+        $null = Part1 (Get-Content "$PSScriptRoot\16_PacketDecoder.txt")
+        $ret = $Script:Stack.Pop()
+        $ret | Should -Be 889
+        {$Script:Stack.Pop()} | Should -Throw   # Stack should be empty
     }
 }
