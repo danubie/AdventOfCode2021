@@ -16,16 +16,6 @@ function ConvertTo-BinaryStringFromHexString ([string]$hexString) {
     return $stream
 }
 
-function Get-PacketVersion ($binString) {
-    $versionString = $binString.Substring(0,3)
-    return [int]"0b$versionString"
-}
-
-function Get-PacketType($binString) {
-    $typeString = $binString.Substring(3,3)
-    return [int]"0b$typeString"
-}
-
 function DebugPacketHeader ($data, $stream) {
     $s = ''
     $s += "[{0}] " -f (' '*($Script:DebugStartStream.Length - $binStream.length) +  $stream)
@@ -61,8 +51,8 @@ function DebugPacketHeader ($data, $stream) {
 }
 
 function Get-PacketHeader ($binstream) {
-    $version = Get-PacketVersion $binstream
-    $type = Get-PacketType $binstream
+    $version = [int] ("0b" + $binstream.Substring(0,3))
+    $type = [int] ("0b" + $binstream.Substring(3,3))
     $typestring = 'N.A.'
     $typelen = 'N.A.'
     $typecnt = 'N.A.'
