@@ -4,7 +4,6 @@ Class Cave {
     static [hashtable] $Caves
     [string] $Name
     [Cave[]] $CavesConnected = @()
-    # static [System.Collections.Stack]$StackPaths = @()
     static [System.Collections.ArrayList] $Results = @()
 
     Cave () {
@@ -24,7 +23,6 @@ Class Cave {
             Write-Warning "Cave $Name already exists"
         }
         [Cave]::Caves.Add($Name, $This)
-        # [Cave]::StackPaths = New-Object System.Collections.Stack
         [Cave]::Results = New-Object System.Collections.ArrayList @()
         Write-Verbose "Cave $Name created"
     }
@@ -36,7 +34,6 @@ Class Cave {
     static [void] ClearList() {
         Write-Verbose "Clearing caves"
         [Cave]::Caves = @{}
-        # [Cave]::StackPaths = New-Object System.Collections.Stack
         [Cave]::Results = [System.Collections.ArrayList]::new()
     }
 
