@@ -1,30 +1,34 @@
 Set-StrictMode -Version 1
 Write-Verbose "Class Cave included"
 Class Cave {
-    static [hashtable] $Caves
     [string] $Name
     [Cave[]] $CavesConnected = @()
+    [int] $VisitsLeft = [int]::MaxValue
+
+    static [hashtable] $Caves
+    static [System.Collections.Stack]$StackPaths = @()
     static [System.Collections.ArrayList] $Results = @()
 
-    Cave () {
-        if ($null -eq [Cave]::Caves) {
-            [Cave]::Caves = @{}
-        }
-    }
+    Cave () {}
 
-    [void] Reset () {}
-
-    Cave (
-        [string] $Name
-    ) {
+    Cave ([string] $Name) {
         $This.Name = $Name
         $This.Reset()
         if ([Cave]::Caves.ContainsKey($Name)) {
             Write-Warning "Cave $Name already exists"
         }
         [Cave]::Caves.Add($Name, $This)
+        [Cave]::StackPaths = New-Object System.Collections.Stack
         [Cave]::Results = New-Object System.Collections.ArrayList @()
         Write-Verbose "Cave $Name created"
+    }
+
+    [void] Reset () {
+        if ($This.Name.ToUpper() -ceq $This.Name -or $This.Name -eq 'end') {
+            $This.VisitsLeft = [int]::MaxValue
+        } else {
+            $This.VisitsLeft = 1
+        }
     }
 
     [string] ToString () {
@@ -34,11 +38,32 @@ Class Cave {
     static [void] ClearList() {
         Write-Verbose "Clearing caves"
         [Cave]::Caves = @{}
+        [Cave]::StackPaths = New-Object System.Collections.Stack
         [Cave]::Results = [System.Collections.ArrayList]::new()
     }
 
     static [boolean] Exists ([string] $Name) {
         return [Cave]::Caves.ContainsKey($Name)
+    }
+
+    [void] PushStack () {
+        # $AllCaves = New-Object -TypeName PSObject -Property @()
+        $AllCaves = foreach ($cName in [cave]::Caves.Keys){
+            $cCopy = New-Object -TypeName psobject -Property @{
+                Name = [cave]::Caves[$cName].Name;
+                VisitsLeft = [cave]::Caves[$cName].VisitsLeft;
+            }
+            $cCopy
+        }
+        [Cave]::StackPaths.Push($AllCaves)
+    }
+
+    [void] PopStack () {
+        $AllCaves = [Cave]::StackPaths.Pop()
+        foreach ($c in $AllCaves) {
+            [Cave]::Caves[$c.Name].VisitsLeft = $c.VisitsLeft
+        }
+        $AllCaves = $null
     }
 
     [void] ConnectTo ([string] $CaveName) {
@@ -70,16 +95,23 @@ Class Cave {
         $Cave.ConnectTo($This)
     }
 
-    [boolean] CanBePassed ([string] $PathTillNow) {
-        if ($This.Name -eq 'start') {
-            return $false
-        }
-        if ($This.Name.ToLower() -ceq $this.Name) {
-            $PathTillNow -notlike "*,$($This.Name)*"
-        } else {
+    [boolean] CanBePassed () {
+        $ret = $This.Name -eq 'start' -or $This.VisitsLeft -gt 0
+        Write-Verbose "Cave $($This.Name) can be passed: $($ret)"
+        return $ret
+    }
 
+    [void] Visit () {
+        if ($This.Name -eq 'start') {
+            Write-Verbose "Visited $($This.Name)"
+            return
         }
-        return ($PathTillNow -notlike "*,$($This.Name)*")
+        if ($This.VisitsLeft -le 0) {
+            Write-Warning "Ignored: $($This.Name) has no visits left"
+            return
+        }
+        $This.VisitsLeft -= 1
+        Write-Verbose "Visited $($This.Name)"
     }
 
     [void] FindPath ([string] $PathTillNow) {
@@ -91,20 +123,17 @@ Class Cave {
         # ein klein geschriebener darf nie als mein Nachfolger vorkommen
         if ($This.Name -cmatch '[a-z]+') {
             if ($PathTillNow -like "*,$($This.Name),*") {
-                Write-Verbose "small letter cave already in path $($This.Name)"
+                Write-Verbose "VisitsLeft = $($This.VisitsLeft); small letter cave already in path $($This.Name)"
                 return
             }
         }
         $ret = foreach ($Cave in $This.CavesConnected) {
-            # ein klein geschriebener darf nie als mein Nachfolger vorkommen
-            if ($Cave.Name -cmatch '[a-z]+') {
-                if ($PathTillNow -clike ",$($Cave.Name),*") {
-                    Write-Verbose "small letter cave ignored $($Cave.Name) in [$PathTillNow]"
-                    continue
-                }
-            }
-            # für jeden anderen: suche den nächsten Nachfolger
+            if ($Cave.CanBePassed()) {  }            # ein klein geschriebener darf nie als mein Nachfolger vorkommen
+            $This.PushStack()
+            $This.Visit()
             $Cave.FindPath($PathTillNow+$This.Name+',')         # this is ok, because no upper case cave is connected to another upper case cave
+            $This.PopStack()
+            Write-Information "huhu"
         }
     }
 
